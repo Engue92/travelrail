@@ -3,7 +3,7 @@
 -- http://www.phpmyadmin.net
 --
 -- Client :  127.0.0.1
--- Généré le :  Dim 13 Décembre 2020 à 20:52
+-- Généré le :  Lun 14 Décembre 2020 à 17:37
 -- Version du serveur :  10.1.10-MariaDB
 -- Version de PHP :  5.6.15
 
@@ -41,8 +41,12 @@ INSERT INTO train(t_type,t_capacity,t_maintenance_date)
 VALUES (type,capacity,maintenance_date)$$
 
 CREATE DEFINER=`root`@`localhost` PROCEDURE `create_new_travel` (IN `departure_date` DATE, IN `departure_hour` TIME, IN `departure_station` VARCHAR(50), IN `arrival_hour` TIME, IN `arrival_station` VARCHAR(50), IN `price` FLOAT, IN `train_id` INT)  NO SQL
-INSERT INTO travel(tr_departure_date, tr_departure_hour, tr_departure_station, tr_arrival_hour, tr_arrival_hour, tr_price, train_id)
+INSERT INTO travel(tr_departure_date, tr_departure_hour, tr_departure_station, tr_arrival_hour, tr_arrival_station, tr_price, train_id)
 VALUES (departure_date, departure_hour, departure_station, arrival_hour, arrival_station, price, train_id)$$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `creat_new_ticket` (IN `exchangeable` TINYINT, IN `refundable` TINYINT, IN `class` TINYINT, IN `departure_date` DATE, IN `departure_station` VARCHAR(50), IN `destination` VARCHAR(50), IN `reduction_card` VARCHAR(50), IN `client_id` INT, IN `payment_id` INT)  NO SQL
+INSERT INTO ticket(ticket_exchangeable, ticket_refundable, ticket_class, ticket_departure_date, ticket_departure_station, ticket_destination, book_reduction_card, client_id, payment_id)
+VALUES (exchangeable, refundable, class, departure_date, departure_station, destination, reduction_card, client_id, payment_id)$$
 
 CREATE DEFINER=`root`@`localhost` PROCEDURE `get_avgPrice_by_destination` (IN `Destination` VARCHAR(50))  NO SQL
 SELECT ticket.ticket_departure_station, AVG(ticket.ticket_price) 
@@ -60,14 +64,14 @@ WHERE UCASE(travel.tr_arrival_station) = UCASE(Destination)
 $$
 
 CREATE DEFINER=`root`@`localhost` PROCEDURE `get_passengers_by_departure` (IN `Departure` VARCHAR(50))  NO SQL
-SELECT  client.c_lastName, client.c_firstnName FROM client
+SELECT  client.c_lastName, client.c_firstName FROM client
 INNER JOIN ticket on client.client_id = ticket.client_id
 INNER JOIN assign on assign.ticket_id= ticket.ticket_id
 INNER JOIN travel on assign.travel_id = travel.travel_id
 WHERE UCASE(travel.tr_departure_station) = UCASE(Departure)$$
 
 CREATE DEFINER=`root`@`localhost` PROCEDURE `get_scheduled_by_train` (IN `id_train` INT(50))  NO SQL
-SELECT travel.tr_departure_date, travel.tr_departure_hour, travel.tr_departure_station, travel.tr_destination
+SELECT travel.tr_departure_station, travel.tr_departure_date, travel.tr_departure_hour, travel.tr_arrival_station, travel.tr_arrival_hour
 FROM train
 
 INNER JOIN travel ON train.train_id = travel.train_id
@@ -79,9 +83,9 @@ WHERE (train.train_id = id_train) AND (travel.tr_departure_date BETWEEN curdate(
 $$
 
 CREATE DEFINER=`root`@`localhost` PROCEDURE `get_scheduled_by_travel` (IN `Departure` VARCHAR(50), IN `Destination` VARCHAR(50))  NO SQL
-SELECT tr_departure_date,tr_departure_hour,tr_departure_station,tr_arrival_station
+SELECT tr_departure_station, tr_departure_date, tr_departure_hour, tr_arrival_station, tr_arrival_hour
 FROM travel
-WHERE UCASE(tr_departure_station) = UCASE(Departure) AND UCASE(tr_departure_station) = UCASE(Destination)
+WHERE UCASE(tr_departure_station) = UCASE(Departure) AND UCASE(tr_arrival_station) = UCASE(Destination)
 
 # UCASE nous permet de tout mettre en majuscule 
 # Ca nous permet d'avoir le resultat souhaiter même si l'utilisateur rentre une destination en minuscule
@@ -97,10 +101,10 @@ WHERE UCASE(travel.tr_departure_station) = UCASE(Departure)
 # Par exemple paris ou PARIS au lieu de Paris
 $$
 
-CREATE DEFINER=`root`@`localhost` PROCEDURE `get_trips_passengersNames_by_trainType` (IN `train_type` VARCHAR(50))  NO SQL
-SELECT  travel.tr_departure_date, travel.tr_departure_hour, travel.tr_departure_station, travel.tr_destination, client.c_lastName, client.c_firstName FROM assign
+CREATE DEFINER=`root`@`localhost` PROCEDURE `get_travel_passengersNames_by_trainType` (IN `train_type` VARCHAR(50))  NO SQL
+SELECT travel.tr_departure_date, travel.tr_departure_hour, travel.tr_departure_station, travel.tr_arrival_station, travel.tr_arrival_hour, client.c_lastName, client.c_firstName FROM assign
 INNER JOIN ticket on assign.ticket_id = ticket.ticket_id
-INNER JOIN client on client.client_id = trip.client_id
+INNER JOIN client on client.client_id = ticket.client_id
 INNER JOIN travel on assign.travel_id = travel.travel_id
 INNER JOIN train on travel.train_id = train.train_id
 WHERE UCASE(train.t_type) = UCASE(train_type)
@@ -160,16 +164,22 @@ CREATE TABLE `city` (
 --
 
 INSERT INTO `city` (`city_name`, `city_zipcode`, `city_country`) VALUES
-('Bordeaux', '33000', 'France'),
-('Bruxelles', '1000', 'Belgique'),
+('BORDEAUX', '33000', 'FRANCE'),
+('BRUXELLES', '1000', 'BELGIQUE'),
 ('Colombes', '92700', 'France'),
+('LILLE', '59000', 'FRANCE'),
 ('Lyon', '69000', 'France'),
 ('Monaco', '98000', 'Monaco'),
+('MONTPELLIER', '34000', 'FRANCE'),
+('NANTES', '44000', 'FRANCE'),
+('NICE', '06000', 'FRANCE'),
 ('Paris', '75000', 'France'),
 ('Rennes', '35000', 'France'),
 ('ROUEN', '76000', 'FRANCE'),
 ('Sceaux', '92330', 'France'),
-('Vannes', '56000', 'France');
+('TOULOUSE', '31000', 'FRANCE'),
+('Vannes', '56000', 'France'),
+('ZURICH', '8000', 'SUISE');
 
 --
 -- Déclencheurs `city`
@@ -206,7 +216,14 @@ INSERT INTO `client` (`client_id`, `c_lastName`, `c_firstName`, `c_mail`, `c_mdp
 (2, 'FABRE', 'Emma', 'emma.fabre@epfedu.fr', '', '1999-06-27', '', '', 'Rennes'),
 (3, 'MASSY', 'Enguerran', 'enguerran.massy@epfedu.fr', '', '1997-11-05', 'av François Bernier ', '23', 'Colombes'),
 (4, 'DUPOND', 'Jean', 'jean.dupond@gmail.com', '123456', '1984-06-11', 'Rue de Rivolie', '59', 'PARIS'),
-(7, 'CASTEX', 'Jean', 'jean.castex@gmail.com', 'jesuis1erministre', '1974-04-25', 'rue Marie Curie', '89', 'Rouen');
+(7, 'CASTEX', 'Jean', 'jean.castex@gmail.com', 'jesuis1erministre', '1974-04-25', 'rue Marie Curie', '89', 'Rouen'),
+(8, 'MACRON', 'Emmanuel', 'manu.macron@elysee.fr', 'cestmoilebosse', '1977-12-21', 'Rue du Faubourg Saint-Honoré', '55', 'PARIS'),
+(9, 'FORD', 'Henry', 'henry.ford@fordmotors.com', 'jaimelesvoitures', '1863-07-30', 'rue du moteur ', '46', 'Toulouse'),
+(10, 'MUSK', 'Elon', 'elon.musk@tesla.com', 'electricvorever', '1971-06-24', 'avenue des fusee', '124', 'Colombes'),
+(11, 'WASHINGTON', 'George ', 'gege.wawa@usa.usa', 'jesuislepremier', '1732-04-13', 'rue de l''amerique', '12', 'Lyon'),
+(12, 'WOOKIE', 'Chewbacca', 'chewbacca@starwars.univers', 'wookiefirst', '0200-12-21', 'Kashyyyk', '24', 'bruxelles'),
+(13, 'CHRIST', 'Jesus', 'jesus.dieu@cieux.paradis', 'jesuispasmort', '0000-00-00', 'rue de paradis', '1', 'Paris'),
+(14, 'JAMES', 'BOND', 'james.bond@mi5.uk', '007', '1953-12-13', 'rue des secret', '007', 'MONTPELLIER');
 
 --
 -- Déclencheurs `client`
@@ -280,6 +297,16 @@ INSERT INTO `payment` (`payment_id`, `p_amount`, `p_type`, `p_date`) VALUES
 (9, '16.80', 0, '2019-12-26'),
 (10, '2.40', 1, '2020-11-19');
 
+--
+-- Déclencheurs `payment`
+--
+DELIMITER $$
+CREATE TRIGGER `set_payment_amount` AFTER INSERT ON `payment` FOR EACH ROW UPDATE payment
+JOIN ticket ON payment.payment_id = ticket.payment_id
+SET payment.p_amount = SUM(ticket.ticket_price)
+$$
+DELIMITER ;
+
 -- --------------------------------------------------------
 
 --
@@ -326,6 +353,20 @@ SET ticket.ticket_price = ticket.ticket_price*1.2
 WHERE ticket.ticket_refundable = 1 OR ticket.ticket_exchangeable = 1 OR ticket.ticket_class = 1
 $$
 DELIMITER ;
+DELIMITER $$
+CREATE TRIGGER `set_ticketPrice_x1.4` AFTER INSERT ON `ticket` FOR EACH ROW UPDATE ticket
+SET ticket.ticket_price = ticket.ticket_price*1.4
+WHERE (ticket.ticket_exchangeable = 1 AND ticket.ticket_refundable = 1)
+OR (ticket.ticket_exchangeable = 1 AND ticket.ticket_class = 1) 
+OR (ticket.ticket_class = 1 AND ticket.ticket_refundable = 1)
+$$
+DELIMITER ;
+DELIMITER $$
+CREATE TRIGGER `set_ticketPrice_x1.6` BEFORE UPDATE ON `ticket` FOR EACH ROW UPDATE ticket
+SET ticket.ticket_price = ticket.ticket_price*1.6
+WHERE (ticket.ticket_refundable = 1 AND ticket.ticket_exchangeable = 1 AND ticket.ticket_class = 1)
+$$
+DELIMITER ;
 
 -- --------------------------------------------------------
 
@@ -354,7 +395,9 @@ INSERT INTO `train` (`train_id`, `t_type`, `t_capacity`, `t_maintenance_date`) V
 (7, 'TGV', 200, '2020-01-14'),
 (8, 'TGV', 250, '2020-10-07'),
 (9, 'TGV', 300, '2020-07-23'),
-(10, 'TGV', 400, '2019-08-06');
+(10, 'TGV', 400, '2019-08-06'),
+(11, 'TER', 200, '2020-10-12'),
+(12, 'TGV', 400, '2020-08-12');
 
 -- --------------------------------------------------------
 
@@ -382,12 +425,14 @@ CREATE TABLE `travel` (
 INSERT INTO `travel` (`travel_id`, `tr_departure_date`, `tr_departure_hour`, `tr_departure_station`, `tr_arrival_hour`, `tr_arrival_station`, `tr_price`, `tr_delay`, `tr_delay_cause`, `train_id`) VALUES
 (1, '2020-11-25', '12:00:00', 'Paris', '00:00:00', 'Rennes', 15, '00:00:00', '', 8),
 (2, '2020-12-24', '08:30:00', 'Paris', '00:00:00', 'Colombes', 2.9, '00:00:00', '', 5),
-(3, '2020-12-10', '10:00:00', 'Colombes', '00:00:00', 'Paris', 2.9, '00:00:05', 'Signalisation', 5),
+(3, '2020-12-16', '10:00:00', 'Colombes', '00:00:00', 'Paris', 2.9, '00:00:05', 'Signalisation', 5),
 (4, '2020-11-20', '14:00:00', 'Bordeaux', '00:00:00', 'Paris', 25, '00:00:00', '', 9),
 (5, '2020-11-22', '19:20:00', 'Lyon', '00:00:00', 'Paris', 30, '00:15:00', 'grève', 2),
 (6, '2020-09-09', '12:00:00', 'Paris', '00:00:00', 'Lyon', 30, '00:00:05', 'Signalisation', 5),
 (7, '2020-12-30', '15:30:00', 'Paris', '00:00:00', 'Bordeaux', 25, '00:00:05', 'Signalisation', 9),
-(8, '2020-12-21', '10:00:00', 'Colombes', '00:00:00', 'Rennes', 12, '00:00:00', '', 4);
+(8, '2020-12-21', '10:00:00', 'Colombes', '00:00:00', 'Rennes', 12, '00:00:00', '', 4),
+(9, '2020-12-24', '12:00:00', 'lyon', '14:00:00', 'marseille', 25, '00:00:00', '', 8),
+(10, '2020-12-30', '10:00:00', 'montpellier', '14:00:00', 'Paris', 35, '00:00:00', '', 10);
 
 -- --------------------------------------------------------
 
@@ -504,7 +549,7 @@ ALTER TABLE `travel`
 -- AUTO_INCREMENT pour la table `client`
 --
 ALTER TABLE `client`
-  MODIFY `client_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+  MODIFY `client_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=15;
 --
 -- AUTO_INCREMENT pour la table `payment`
 --
@@ -519,12 +564,12 @@ ALTER TABLE `ticket`
 -- AUTO_INCREMENT pour la table `train`
 --
 ALTER TABLE `train`
-  MODIFY `train_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
+  MODIFY `train_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
 --
 -- AUTO_INCREMENT pour la table `travel`
 --
 ALTER TABLE `travel`
-  MODIFY `travel_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+  MODIFY `travel_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
 --
 -- Contraintes pour les tables exportées
 --
